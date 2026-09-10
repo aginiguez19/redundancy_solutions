@@ -1,0 +1,707 @@
+---
+title: "Research Journal"
+author: "Abraham G. Iñiguez"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+  toc: yes
+  toc_float:
+    collapsed: true 
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Week of June 15th
+
+# Monday
+
+## Previous Meeting Recap
+
+- Add questions, aims, goals of the paper at the start of Method. These
+  objectives should be answered through my plots
+
+  - In relation to plots, think about starting with explaining the
+    baselines (goal network == matching solution)
+  - Why do certain solutions get better with increasing sparsity (Is it
+    because we have ore variables?)?
+
+- Write description for plots (strength, closeness, betweenness,
+  weighted density, RMSE) by next meeting
+
+- Create `.Rmd` file journaling what I do daily, questions I have, and
+  results$\ldots$
+
+## Notes
+
+Edited Method and resolved comments left by Mijke and Jonathan. I'm
+still unsure about composite models. I tried looking for some
+[papers](https://link.springer.com/article/10.1007/s10651-007-0047-7),
+but I don't think they were helpful in explaining how we form a
+composite in our generating model. Does it matter that our two
+indicators that form a composite have no measurement error? I did find a
+paper by [Christensen et
+al.](https://journals.sagepub.com/doi/10.1002/per.2265) that discusses
+redundancy, wTO, and solutions. Need to finish "Data Generation,
+Solutions, and Performance" section this week.
+
+# Tuesday
+
+Made figures for the 3 generating models. Organized plots for discussion
+on Thursday. Will add interpretation of each plot.
+
+## Common Factor Model
+
+![Figure 1](/Users/aginigue/Downloads/Common_Factor_Model.png)
+
+Figure 1 shows an example of the common factor generating model. There
+are four latent variables (${\eta_{1}, \ldots}, \eta_{4}$). Directed
+edges with arrows represent loadings and undirected edges represent
+partial correlations. The first three variables each have a single
+indicator that loads at 0.9. The variable, $\eta_{4}$, has two
+indicators, with $X_{4}$ loading at 0.9 and the loading ($\lambda_{5}$)
+of $X_{5}$ allowed to vary. All indicators have unit variance
+($\sigma^2_{\epsilon_{1}}, \ldots, \sigma^2_{\epsilon_{5}}$) given by
+$1-\lambda^2$.
+
+## Composite Model
+
+![Figure 2](/Users/aginigue/Downloads/Composite_Model.png) Figure 2
+shows the composite generating model. Here, there are 5 latent variables
+with $\eta_5$ orthogonal to every other variable. The two indicators
+that form a composite are $X_4$ and $X_5$ and have no measurement error.
+The factor loading of both indicators are equal in magnitude and is
+allowed to vary. Their loadings are computed such that each indicator
+will have unit variance and their covariance will be equal to
+$\lambda^2$. All other indicators have unit variance
+($\sigma^2_{\epsilon_{1}}, \ldots, \sigma^2_{\epsilon_{5}}$) given by
+$1-\lambda^2$.
+
+## Unique Variable Model
+
+![Figure 3](/Users/aginigue/Downloads/Unique_Variable_Model.png) Figure
+3 shows the unique variable model. There are 5 unique latent variables
+with $\eta_5$ acting as a duplicate of $\eta_4$. Each variable is
+measured by a single indicator.The loading ($\lambda_5$) of $X_5$ is
+allowed to vary to form different levels of redundancy as found in the
+other two generating models. All indicators have unit variance
+($\sigma^2_{\epsilon_{1}}, \ldots, \sigma^2_{\epsilon_{5}}$) given by
+$1-\lambda^2$.
+
+## Bias in Strength Centrality Measure
+
+These simulations are based off 120 conditions each run for 100
+iterations. For each generating model we apply three solutions (i.e.,
+composite, LNM, or node removal) to every $\Sigma$ correlation matrix.
+The mean latent correlation conditions are averaged for each level of
+sparsity (i.e., 0.1, 0.3, 0.5 $\ldots$, 0.9 is averaged over a sparsity
+of 0, 0.3, 0.5, or 0.7.). The columns (from left to right) correspond to
+the redundancy level (i.e., the strength between the duplicated nodes;
+0.7, 0.85, or 0.9) and the rows correspond to the size of the network
+*p* (10 or 20). The error bars represent one standard error above and
+below the mean. For all local centrality measures, bias is computed in
+relation to the *target* ($p\text{th}$ node), or the node that is
+duplicated to create redundancy with the *clone* ($(p+1)\text{th}$
+node).
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_bias_composite_sparsity.png)
+Across all levels of sparsity and redundancy level, the composite
+solution performed as expected (i.e., a bias of 0) when the goal network
+was composite. When sparsity was not induced, LNM consistently had
+larger bias, especially in a larger network (*p* = 20). This may be due
+to the greater number of parameters needed to be estimated when sparsity
+is not induced. We did not see this same pattern in the composite and
+node removal solution because they performed simple transformations of
+the $\Sigma$ correlation matrix. In contrast to LNM, node removal
+consistently underestimated the strength of the target node, although it
+was comparable to the composite solution expect under a redundancy of
+0.7 and 0.85 and a network size of 20. For all solutions, bias improved
+as the level of sparsity increased with results generally improving when
+half of all possible edges were removed. When *p* = 20 all solutions
+apart from composite had greater bias than when *p* = 10. As mentioned
+above, this was particularly true for LNM.
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_bias_pseudo_sparsity.png)
+
+The $(p+1) \times (p+1)$ goal network was made comparable to each
+solution by taking the average of the target and the clone's edge
+weights. *Should this be occurring? Taking the average of two identical
+nodes is the equivalent of removing one of them which is why the node
+removal solution looks closest. Forming a composite increases our
+reliability so that one makes sense to be higher and same for the LNM. I
+think is occurring because we are transforming the p+1 X p+1 correlation
+matrix to a partial correlation whereas we are messing with it in the
+sigma correlation matrix and therefore changing how the final partial
+correlations look. For example, in the removal solution there is more
+variance explained that can be redistributed to the pth node* Each
+solution consistently overestimated the strength of the Target node and
+performed relatively the same for all levels of the conditions.
+Performance of LNM mirrored the results found when the goal network was
+composite. LNM had greater bias when *p* = 20 and no sparsity was
+induced. With greater sparsity (sparsity = 0.7) the performance of each
+solution improved the most but still showed bias near 0.4. This implies
+that even when the network is quite sparse and redundancy does not
+exist, applying a solution can still affect the estimation of edge
+weights.
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_bias_redundant_sparsity.png)
+
+The results revealed that the LNM performed best compared to the other
+solutions when no sparsity was induced, specifically when *p* = 20. In
+general, variability in the results is due to network size. All
+solutions performed comparably under sparsity \> 0.3 with LNM performing
+slightly better under weaker levels of redundancy and greater network
+size. Importantly, when *p* = 20 and high redundancy (0.9) all solutions
+performed similarly when sparsity increased to 0.3, implying that either
+solution was useful in retrieving the edge weight's of the target node.
+*Unsure why the LNM performs poorly under no sparsity, is it because
+you're estimating the same correlation matrix twice using the same model
+so you're getting some estimates that are really far off? It does
+improve when we have more apparent redundancy. I ended up finding the
+culprit, there was an error in the code, when running LNM my true was
+identifying using the loadings whereas my function was using the
+variances*
+
+## Bias in Closeness Centrality Measure
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_bias_composite_sparsity.png)
+
+The results for closeness largely agreed with those for strength when
+the goal network was composite. A similar pattern arose under conditions
+when LNM was applied without sparsity resulting in greater bias. When
+*p* = 10 and at a sparsity = 0.7, LNM underestimated the closeness of
+the target node. *I wonder if this has something to do with the NAs or
+perhaps the edge weights of the peripheral nodes are being estimated to
+be smaller than what we see in the composite*. Node removal matched the
+composite solution once sparsity hit 50% across all levels of network
+size and redundancy level.
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_bias_pseudo_sparsity.png)
+
+The pattern of results for closeness mirrored that for strength in the
+unique variable network. In contrast, closeness showed notable
+variability across solutions than strength did. For example, when
+sparsity was not induced, node removal performed best across all levels
+of *p* and redundancy. As sparsity increased—specifically, when sparsity
+= 0.7 and *p* = 10—LNM outperformed the other solutions. Overall, all
+solutions overestimated the closeness of the target node in the unique
+variable network.
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_bias_redundant_sparsity.png)
+
+*Any differences found for LNM likely do the coding error* Node removal
+and the composite solution matched across all conditions. It's
+interesting to see that either removing a node or summing up two nodes
+results in a fairly close estimate of the target's closeness when we
+estimate a sparse network. Notably, node removal and the composite
+solution overestimated closeness and had greater bias when the network
+was smaller. *Perhaps, taking node removal for example, removing the
+redundant node increases the closeness of the target in a much sparser
+network because the target may be a more efficient route ie more
+variance can be explained by the target now.*
+
+## Bias in Betweenness Centrality Measure
+
+The plots for bias looked quite similar so I will interpret them in one
+paragraph. When the goal network was generated from a composite or
+unique variable model, the bias in LNM shot up. *I checked the
+iterations of the conditions where this is occurring and it seems that
+every so often the bias will be inflated for conditions where the
+sparsity is high, maybe I ran my simulation with the old betweenness
+function computing relative bias because under normalization the
+betweenness value should be bounded betweene 0 and 1? Solution, delete
+the edge rather than zeroing it (as I realized 0ing it keeps it in the
+network and causes problems when computing betweenness)*
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_bias_composite_sparsity.png)
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_bias_pseudo_sparsity.png)
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_bias_redundant_sparsity.png)
+
+## Bias in Weighted Density Centrality Measure
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_composite_sparsity.png)
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_pseudo_sparsity.png)
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_redundant_sparsity.png)
+
+## RMSE of the Target Node's Edge Weights
+
+Root mean square error (RMSE) measures how far our estimates are from
+the true value by taking the square root of the average squared
+differences. In each plot, RMSE is computed for the target's edge
+weights (i.e., how well does each solution recover the edge weights of
+the target in the goal network)
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_composite_sparsity.png)
+These results matched strength. Composite matched perfectly. LNM
+performs poorly under no sparsity, and then improved as sparsity
+increased. Likewise, node removal underestimated the true value and
+because RMSE is always positve the average values are above 0 but still
+closer to the composite solution then LNM.
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_pseudo_sparsity.png)
+Results matched strength. *This makes sense because strength adds up
+absolute direct connections and RMSE is doing something similar in a
+way*
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_redundant_sparsity.png)
+Quite similar trends to strength just flipped. Again, I think LNM is
+being impacted by the error in my code. All solutions performed
+comparably under sparsity \> 0.3 with LNM performing slightly better
+under weaker levels of redundancy and greater network size.
+
+# Wednesday
+
+## Notes
+
+Organized plots on .RMD. Spent most of time writing interpretation of
+plots.
+
+# Thursday
+
+## Notes
+
+Worked early the morning to interpret the rest of the plots and found
+some problems
+
+- Why is LNM bias so high when sparsity = 0
+- Identification in LNM is different between true and est
+- Delete edges rather than zeroing them out
+
+## Meeting Recap
+
+- Cite Henseler-Ogasawara specification paper (Schuberth) for composite
+  model
+  - Match the position of variables in common and unique models
+- Why is bias high for strength, check the matrices
+  - Check identification in LNM degree of freedom
+  - Plot the networks/distribution of the partial correlations in no
+    sparsity condition
+- Use harmonic_centrality for computing closeness
+- Figure out the betweenness of all the other nodes
+- Add shape argument to plots
+- Map out what position the 0s are in the networks are generated
+- Add what I did and what needs to get done in journals
+
+# Friday
+
+## Notes
+
+[**Changes made**]{.underline}
+
+- Changed `E(est.ig)$weight[abs(E(est.ig)$weight) < 1e-4] = 0` to
+  `est.ig = delete_edges(est.ig, E(est.ig)[abs(E(est.ig)$weight) < 1e-4])`
+  to remove the edge when computing centrality measures. This change was
+  also made to `true.ig` and `true.ig.final` in the function
+  `calc.all.metrics()`
+
+- Matched identification argument in `apply.lnm()` with how the goal
+  network was being simulated. Identification is now set to "variance".
+  Setting the argument to "variance" fixes all latent variances to 1,
+  allowing all factor loadings to be freely estimated.
+
+- Within `lnm()` the loading of the `[p+1, p]` indicator is fixed to 0.9
+  to better recover estimates of the edges in the goal networks.
+  Previously, the loading of that same indicator was fixed to 1 and this
+  led to estimation issues such as matrices that were nonsensical (all
+  estimates were 0.9). I'm not sure why my fix works better, but my
+  intuition says that we now have enough elements to estimate the
+  network when the redundancy indicator is fixed to 0.9 (if this is even
+  what's going on). When all loadings are set to 1, according to
+  [psychonetrics](https://psychonetrics.org/lvm.html) documentation,
+  that means all loadings are freely estimated. A 0 means that a loading
+  is fixed to 0. There is no information on any other value.
+
+[**Tasks**]{.underline}
+
+- Rerun simulation with changes and reinterpret plots
+  - jot down any issues and organize test script
+- Develop questions and organize structure of presentations
+
+# Week of June 22nd
+
+# Monday
+
+## Notes
+
+- Reran simulation with changes and plotted results
+
+## Bias in Strength Centrality Measure (Run 2)
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_composite_sparsityV3.png)
+Across all levels of sparsity and redundancy level, the composite
+solution performed as expected (i.e., a bias of 0) when the goal network
+was composite. Our range is 0.2 to (-0.4). LNM had larger bias than node
+removal when the degree of redundancy = 0.7 (*p* = 20) and 0.9 (*p* = 10
+& 20) but not when redundancy = 0.7 (*p* = 10) and 0.8 (*p* = 10 & 20).
+Node removal consistently underestimated the strength of the target
+node, when *p* = 10 and 20, the bias decreased as sparsity increased.
+Also, when *p* = 10, under no sparsity, the the bias decreased from -0.2
+to -0.1 as the the redundancy grew stronger, this same pattern arose
+when *p* = 20, starting at *p* = -0.3 and decreasing to \< -0.2. LNM
+performed the best when the sparsity was at the max tested. In general,
+the LNM solution performed better than removal at higher levels of
+redundancy and sparsity and is the recommended solution here.
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_pseudo_sparsityV3.png)
+
+- Bias is expected here because we are modeling a network where every variable is unique so we do not want to apply a solution 
+
+- LNM had the least bias when there was 0 sparsity, and the most spread in solutions was seen
+
+- LNM and node removal performed similarly 
+
+- As sparsity increased from 0.5 onward all solutions peformed similarly 
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_redundant_sparsityV3.png)
+
+- Baseline no bias
+
+- Under the first column whne redundancy is 0.7, removal performs better
+  as sparsity increased
+
+    - Within p = 10, the pattern is flipped with composite outperforming removal as sparsity increased
+  
+    - Withing p = 20, this pattern is more varied with removal improving from sparsity of 0.3 --> 0.5 but not when sparsity is highest
+
+## Bias in Closeness Centrality Measure (Run 2)
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_composite_sparsityV3.png)
+
+- The range of values have dropped on the Y-axis, but the pattern we saw in strength carries over
+  
+    - Normalization
+    - Closeness values are ultimately smaller
+  
+- Baseline composite has 0 bias
+
+- Removal underestimated measure for all conditions
+
+- LNM performed well expect under higher levels of redundancy and no sparsity
+
+    - More affected in larger networks
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_pseudo_sparsityV3.png)
+- Bias is expected
+
+- LNM had the least bias when there was 0 sparsity, and most spread in solutions
+
+- LNM and node removal performed similarly throughout
+
+
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_redundant_sparsityV3.png)
+
+- Baseline redundant no bias
+
+- Under the first column when redundancy is 0.7, removal performed better as sparsity increased
+
+    - Within p = 10, the pattern flips with composite outperforming removal as sparsity increased
+    - Within p = 20, this pattern generally stays the same with composite starting to out perform as sparsity increased 0.5 onward
+
+## Bias in Betweenness Centrality Measure (Run 2)
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_composite_sparsityV3.png)
+
+- Pattern the same as we saw in strength
+
+- Baseline composite has 0 bias
+
+- Removal underestimated measure for all conditions
+
+- LNM performed better than removal in all conditions until the redundancy increased to 0.9. It becomes more varied in a larger network but LNM catches up faster in a smaller network 
+
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_pseudo_sparsityV3.png)
+
+
+- Bias is expected
+
+- LNM and node removal perform similarly throughout
+
+- As sparsity increased from 0.5 all solutions performed similarly
+
+    - With a decreasing trend when p = 10 and and upward trend for the larger network 
+    
+    
+
+
+
+
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/closeness_redundant_sparsityV3.png)
+
+- Baseline redundant no bias 
+
+- Under the first column when redundancy is 0.7, removal performed better as sparsity increased 
+
+    - Within p = 10, the pattern generally flipped with composite outperforming removal as sparsity increased
+    - Withing p = 20, the pattern is more varied with removal performing better from 0.3 --> 0.5 when the network is larger but not when sparsity is highest
+    
+    
+## Bias in Weighted Density  (Run 2)
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_composite_sparsity.png)    
+    
+- The effect of a redundant node is localized to the target
+
+- The trends have stayed the same on the other hand
+
+
+### Goal Network: Unique Variable
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_pseudo_sparsity.png)   
+
+- LNM performed better at 0 sparsity, but all peformed similarly after 
+
+- At a smaller network, the bias starts off worse and has a steep improvement after 
+
+
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/wd_bias_redundant_sparsity.png) 
+
+- Pattern stays the same but again a localized effect
+
+
+## RMSE  (Run 3
+
+### Goal Network: Composite
+
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_composite_sparsityV3.png)    
+
+- For p = 20, RMSE is lower for removal solution. At higher redundancy, and at no sparsity RMSE is highest for LNM
+
+
+### Goal Network: Unique Variable
+
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_pseudo_sparsityV3.png)
+
+- LNM starts out with the lowest RMSE
+
+- Removal has the smallest RMSE after sparsity is > or = to 0.5
+
+
+### Goal Network: Common Factor
+
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_redundant_sparsityV3.png)
+
+- Baseline redundant no bias
+
+- Under the first column, composite performed better but performed similarly after sparsity is introduced
+
+    - Within p = 10, this pattern flipped with the composite solution out performing removal as sparsity increased and so did redundancy
+    
+    - Within p = 20, this pattern is more varied with composite having higher RMSE when no sparsity is induced but performed similar there after
+    
+    
+[**Tasks**]{.underline}
+
+- Develop questions and organize structure of presentations
+
+# Tuesday
+
+## Notes
+
+- Created/worked on presentation
+
+[**Tasks**]{.underline}
+
+- Work on presentation
+
+- Begin writing again for both projects
+
+
+# Wednesday
+
+## Notes
+
+- Drove back most of day from SoCal and continued working on presentation
+
+
+# Week of June 29th
+
+# Week of July 6th
+
+
+# Week of July 13th
+
+# Monday
+
+## Notes
+
+- Worked on IMPS presentation
+
+# Tuesday
+
+## Notes
+
+- Worked on results of P1
+
+# Wednesday
+
+## Notes
+
+- Finished up writing results of P1
+
+
+## Bias in Strength Centrality Measure (Run 5)
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_redundant_sparsityV5.png)
+
+
+- Across conditions, the composite and removal solution underestimated the strength of the target node when the generating model is the common factor model. 
+
+- The composite solution performed better in comparison to the removal solution as redundancy is increased. 
+
+- Bias is highest for all solutions except lnm when sparsity = 0. 
+
+- Combining two redundant items when the generating model is the common factor was the best solution other than lnm. 
+
+- How does measurement error affect the composite solution here?
+
+
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/strength_composite_sparsityV5.png)
+
+- Across conditions, the removal solution underestimated the strength of the target node when the generating model was composite. The lnm solution overestimated the strength of the target node. 
+
+- When sparsity = 0 the network is dense. When the network is both dense, larger, and variables are strongly correlated with each other, LNM has trouble estimating the parameters. Could this be occurring because of how the composite sigma matrix is generated (i.e., due to the orthogonal variable)?
+
+- The pattern found in the lnm solution at sparsity = 0 dropped considerably under high redundancy for both levels of $p$.  
+
+- As redundancy increased both lnm and removal solutions performed better. The removal solution outperformed the lnm solution, up to sparsity = 0.5. 
+
+
+## Bias in Betweenness Centrality Measure (Run 5)
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_redundant_sparsityV6.png)
+
+- Betweenness results were similar to the strength results.
+
+- Notably, the bias was quite low for all solutions. 
+
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/betweenness_composite_sparsityV6.png)
+- Bias was higher for the lnm solution. I wonder if the bias for the removal solution here was similar to when the generating model is the common factor and the lnm solution is masking this pattern?  
+
+## RMSE (Run 5)
+
+### Goal Network: Common Factor
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_redundant_sparsityV5.png)
+
+- LNM performed well until high redundancy and sparsity = 0.5 in a larger network.
+
+
+
+### Goal Network: Composite
+
+![](/Users/aginigue/Library/CloudStorage/Box-Box/Solutions_P2/RMSE_composite_sparsityV5.png)
+
+- Removal outperformed lnm in all conditions.
+
+
+# Week of July 20th
+
+## Notes
+
+IMPS 2026 Conference. Symposium. Made connections with manager at NCSBN, Chicago. 
+
+- Klint Kanopka suicide research
+- Cary Lin (NCSBN)
+- Vivato (Bayesian Networks)
+- IRT 
+- Composites and latent variables
+
+
+# Week of July 27th
+
+# Wednesday
+
+## Notes
+
+Let's reorient ourselves in regard to Project 1 and 2 timelines in tomorrow's meeting. I am finishing up the Discussion section for Project 1 paper. I will finish writing that by the end of this week or early next week (Tuesday).
+
+We are still understanding Project 2 results (RMSE, Heywood cases, sparsity behavior) and should probably discuss what steps to take here. 
+
+I also remember that there's some code that allows us to play with the boundaries of the wTO method, where is that code? 
+
+Here's a [paper](http://www.jstor.org/stable/3648139) we can read for next week? 
+
+
+
+
+
+
+
