@@ -652,49 +652,7 @@ collapse.pseudo = function(mat, p) {
 }
 
 
-# Test for results why is everything overestimating 
-# Why is removal doing bad too? 
-
-# p = 10
-# sparsity = 0
-# mat  = cor.gen(nvar = 10)
-# mat2 = latent.gen(mat)
-# sigma = donothing.gen(mat2$latent.sparse)
-# apply.removal(sigma, p =4) # Removal solution
-# true = cor2pcor(sigma) # True pseudo
-# collapse.pseudo(mat = true, p =4) # Works correctly
-# 
-# sigma = sigma.gen(mat2$latent.sparse, peripheral.loadings = 0.9,
-#           clone.loading =  0.7)
 
 
 
-
-
-# Test why I saw LNM perform poorly even when it is the correct solution
-# p = 10
-# sparsity = 0
-# mat  = cor.gen(nvar = 10)
-# mat2 = latent.gen(mat)
-# 
-# sigma = sigma.gen(mat2$latent.sparse, peripheral.loadings = 0.9,
-#                   clone.loading =  0.7)
-# 
-# solution = apply.lnm(sigma, p = 10)
-# lambda.true = diag(x = 1, nrow = p + 1, ncol = p)
-# lambda.true[p + 1, p] = 1
-# mod.lnm = lnm(cors = sigma,
-#     nobs = 10000,
-#     lambda = lambda.true,
-#     omega_zeta = "full",
-#     identification = "loadings") %>% 
-#   runmodel()
-# omega.latent = getmatrix(mod.lnm, "omega_zeta")
-# 
-# true = pcor.to.igraph(omega.latent)
-# est = pcor.to.igraph(solution)
-# 
-# calc.strgth.bias(est, true)
-# strength(true)
-# strength(est)
 

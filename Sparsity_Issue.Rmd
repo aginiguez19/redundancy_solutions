@@ -1,0 +1,585 @@
+---
+title: "P2_Sparsity_Issue"
+author: "Abraham G. Iñiguez"
+date: "2026-09-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Sparsity (version 1.0.0)
+
+### Functions Needed
+
+```{r}
+
+# Sample correlation matrix
+cor.gen = function(nvar = NULL,
+                   bg.cor = 0.30,
+                   mn.cor = 0.50,
+                   prop.cor = 1,
+                   iter.lim = 100,
+                   sd = 0.05,
+                   tol.eig = 1e-1,
+                   mean.tol = 0.005,
+                   clip = 0.99){
+  
+  
+  
+  flag = 0
+  iter = 0
+  
+  
+  n_lower = (nvar^2 - nvar) / 2 # Unique off-diagonal elements 
+  n.big = floor(n_lower * prop.cor)
+  
+  while(flag < 1){
+    iter = iter + 1
+    
+    temp = matrix(rnorm(nvar^2, mean = bg.cor, sd = sd), nvar, nvar) 
+    
+    diag(temp) = 1 # Set diagonals to 1 to be correlations 
+    
+    idx.lower = which(lower.tri(temp)) # R column-major indexing 
+    
+    if (n.big > 0) {
+      idx.big = sample(idx.lower, n.big)
+      temp[idx.big] = rnorm(n.big, mean = mn.cor, sd = sd) 
+      
+    } else {
+      idx.big = integer(0)
+    }
+    
+    temp[lower.tri(temp)] = pmax(pmin(temp[lower.tri(temp)], clip), -clip)
+    # any values less than or greater than clip will be replaced by clip, making the correlations bounded between -1 and 1
+    temp[upper.tri(temp)] = t(temp)[upper.tri(temp)]
+    # Replace lower elements with upper
+    diag(temp) = 1
+    
+    # Eigen check
+    E = eigen(temp, symmetric = TRUE) # Provides eigenvalues and vectors, eigen decomposition 
+    # t(E$vectors) %*% E$vectors will give the identity matrix, all eigenvalues must be >= 0
+    # E$vectors %*% diag(E$values, nrow = 5, ncol = 5) %*% solve(E$vectors) = temp (although symmetric)
+    vals = E$values # Eignevalues
+    vals[vals < tol.eig] = tol.eig # Replace any with a really small positive value that are less than 0
+    temp.psd = E$vectors %*% (diag(vals, nvar, nvar)) %*% t(E$vectors) # eigenvectors are orthonormal so that its inverse is equal to its transpose
+    # Rebuild the matrix that is psd  
+    d = sqrt(diag(temp.psd)) # Ensure it is correlation matrix
+    temp_cor = temp.psd / outer(d, d)
+    diag(temp_cor) = 1
+    
+    if (length(idx.big) > 0) {
+      big.mean = mean(temp_cor[idx.big]) # Average correlation size of larger correlations 
+    } else {
+      big.mean = NA_real_
+    }
+    setdiff(idx.lower, idx.big) # Returns elements present in first object but not in 2nd
+    idx.bg = setdiff(idx.lower, idx.big)
+    if (length(idx.bg) > 0) {
+      bg.mean = mean(temp_cor[idx.bg])
+    } else {
+      bg.mean = NA_real_
+    }
+    # Write what iteration and the average correlations of either baseline or larger
+    cat("\r", paste0("Iter ", iter,
+                     " | big mean=", ifelse(is.na(big.mean), "NA", round(big.mean, 3)),
+                     " | bg mean=", ifelse(is.na(bg.mean), "NA", round(bg.mean, 3))), sep = "")
+    flush.console()
+    # Tolerance, if less than whatever mean.tol is then move on(how off we are willing to be from set correlation)
+    ok_big = if (length(idx.big) > 0) abs(big.mean - mn.cor) <= mean.tol else TRUE
+    ok_bg  = if (length(idx.bg) > 0)  abs(bg.mean - bg.cor) <= mean.tol else TRUE
+    ok = ok_big && ok_bg
+    # If TRUE send loop and return PSD matrix 
+    if (ok) {
+      flag = 1
+      cat("\n")
+      return(temp_cor)
+    }
+    
+    if (iter >= iter.lim) {
+      flag = 1
+      cat("\nReached Iteration Limit. Returning last PSD correlation matrix.\n")
+      return(temp_cor)
+    }
+  }
+  
+  cat("\n")
+  return(NULL)
+}
+
+# Move from covariance to correlation matrix
+
+cov2cor = function(mat){
+  inv.sd = diag(1/sqrt(diag(mat)))
+  matrix = inv.sd %*% mat %*% inv.sd
+  return(matrix)
+}
+
+
+# Move from correlation to partial correlation matrix
+
+cor2pcor <- function(mat){
+  precision.mat <- solve(mat)
+  pcor.mat <- qgraph::wi2net(precision.mat)
+  pcor.mat <- as.matrix(pcor.mat)
+  return(pcor.mat)
+}
+
+
+# Generate a sparse precision matrix 
+sparse.prec.mat = function(mat, prop = .3, tol = 1e-1, max.iter = 100){
+  
+  
+  p = nrow(mat)
+  fail.count = 0
+  prec.mat = solve(mat)
+  idx.lower = which(lower.tri(prec.mat)) 
+  p.zero = floor(prop * length(idx.lower))  
+  
+  for (i in 1:max.iter) {
+    idx.zero = sample(idx.lower, p.zero) 
+    
+    prec.mat[idx.zero] = 0  
+    
+    prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] 
+    
+    # Check for PSDness
+    E = eigen(x = prec.mat, symmetric = TRUE)
+    vals = E$values
+    vals[vals < 0] = tol
+    psd = E$vectors %*% (diag(vals, p, p)) %*% t(E$vectors)
+    
+    psd[idx.zero] = 0 
+    psd[upper.tri(psd)] = t(psd)[upper.tri(psd)]
+  
+    
+    if(min(eigen(psd)$values) > 1e-8){
+      message("Found correct PSD matrix after ", fail.count, " failed attempt(s)")
+      return(psd)
+    }
+    
+    fail.count = fail.count + 1
+    
+  }
+  message("No valid matrix found after ", max.iter, " iterations")
+  return(NULL)
+  
+}
+
+
+# Combines sparse.prec.mat() to return both the sparse precision matrix and transformed latent correlation matrix 
+
+sparse.lat = function(mat){
+  precision = round(sparse.prec.mat(mat = mat,
+                             prop = sparsity), 4)
+  
+# Take precision matrix and turn back into a correlation matrix
+  latent = round(cov2cor(solve(precision)), 4)
+  colnames(latent) = colnames(precision) = c(paste0("p",
+                                                          1:(p -1)),
+                                                   "target")
+  rownames(latent) = rownames(precision) = c(paste0("p",
+                                                          1:(p -1)),
+                                                   "target")
+  return(list(lat.mat = latent,
+              prec.mat = precision))
+}
+
+
+# Add redundancy to model implied matrix using latent correlation matrix
+
+sigma.gen = function(mat, peripheral.loadings = .9, clone.loading = .9){
+  dim.mat = dim(mat)
+  lambda = diag(x = peripheral.loadings, nrow = dim.mat[1] + 1, ncol = dim.mat[2])
+  lambda[nrow(lambda), ncol(lambda)] = clone.loading
+  item.mat = lambda %*% mat %*% t(lambda)
+  dim.theta = dim(item.mat)
+  theta = diag(x = 1 - (peripheral.loadings)^2,
+               nrow = dim.theta[1],
+               ncol = dim.theta[2])
+  theta[nrow(theta), ncol(theta)] = 1 - (clone.loading)^2
+  
+  sigma = item.mat + theta 
+  
+
+  colnames(sigma) = rownames(sigma) = c(paste0("p", 1:(p -1)),
+                                        "target",
+                                        "clone")
+
+  
+  return(round(sigma, 4))
+}
+
+
+# LNM solution
+
+apply.lnm = function(sigma, p, nobs = 10000) {
+  lambda = diag(x = 1, nrow = p + 1, ncol = p)
+  lambda[p + 1, p] = 1
+  mod = lnm(cors = sigma, lambda = lambda, nobs = nobs,
+             omega_zeta = "full", identification = "variance") |>
+    runmodel()
+  round(getmatrix(mod, "omega_zeta"), 4)
+}
+
+# CFA 
+
+write.cfa <- function(p, cloneloading) {
+  lineend <- "\n "
+  cfa.mod <- ""
+  v <- 0
+  for (j in 1:(p-1))   {
+    v <- v + 1
+    cfa.mod <- paste0(cfa.mod, "F", j, " =~ 1*p", v, sep = "")
+    cfa.mod <- paste0(cfa.mod, lineend, sep = " ")
+  }
+  cfa.mod <- paste0(cfa.mod, "F", p, " =~ .9*target + ", cloneloading, "*clone")
+  return(cfa.mod)
+}
+
+
+```
+
+### Process
+
+```{r}
+library(qgraph)
+library(psychonetrics)
+library(lavaan)
+# Sample a 5x5 latent correlation matrix
+# Set p 
+p = 5
+latent.mat = cor.gen(nvar = p)
+
+# Set desired sparsity and add sparsity
+sparsity = 0.3
+sparse.mats = sparse.lat(latent.mat)
+
+# Subset by the latent correlation matrix and verify that it produces a sparse graph
+sparse.mats$prec.mat
+qgraph(round(cor2pcor(sparse.mats$lat.mat), 4), edge.labels = TRUE,
+       theme = 'colorblind')
+
+# Generate sigma matrix with redundancy using latent correlation matrix from previous step
+
+redun.sigma = sigma.gen(mat = sparse.mats$lat.mat)
+
+
+# Apply 'lnm' solution and see if graph is sparse
+estimate = apply.lnm(redun.sigma, p = 5) # Set p
+rownames(estimate) = colnames(estimate) = c(paste0("p", 1:(p-1)), "target")
+estimate # No sparsity
+qgraph(estimate, edge.labels = TRUE,
+       theme = "colorblind", labels = c(paste0("p", 1:(p-1)), "target")) 
+
+
+
+cfamod <- write.cfa(p = p, cloneloading = 0.9)
+fitcfa <- cfa(model = cfamod, sample.cov = redun.sigma, sample.nobs = 100000, std.lv = TRUE)
+true.R <- lavInspect(fitcfa, "cov.lv")
+true.pcor = round(cor2pcor(true.R), 4)
+
+qgraph(true.pcor, edge.labels = TRUE,
+       theme = "colorblind", labels = c(paste0("p", 1:(p-1)), "target")) 
+
+
+estimate - true.pcor
+
+
+```
+
+## Sparsity (version 2.0.0)
+
+### Functions Needed
+
+```{r}
+
+# Sample correlation matrix
+cor.gen = function(nvar = NULL,
+                   bg.cor = 0.30,
+                   mn.cor = 0.50,
+                   prop.cor = 1,
+                   iter.lim = 100,
+                   sd = 0.05,
+                   tol.eig = 1e-1,
+                   mean.tol = 0.005,
+                   clip = 0.99){
+  
+  
+  
+  flag = 0
+  iter = 0
+  
+  
+  n_lower = (nvar^2 - nvar) / 2 # Unique off-diagonal elements 
+  n.big = floor(n_lower * prop.cor)
+  
+  while(flag < 1){
+    iter = iter + 1
+    
+    temp = matrix(rnorm(nvar^2, mean = bg.cor, sd = sd), nvar, nvar) 
+    
+    diag(temp) = 1 # Set diagonals to 1 to be correlations 
+    
+    idx.lower = which(lower.tri(temp)) # R column-major indexing 
+    
+    if (n.big > 0) {
+      idx.big = sample(idx.lower, n.big)
+      temp[idx.big] = rnorm(n.big, mean = mn.cor, sd = sd) 
+      
+    } else {
+      idx.big = integer(0)
+    }
+    
+    temp[lower.tri(temp)] = pmax(pmin(temp[lower.tri(temp)], clip), -clip)
+    # any values less than or greater than clip will be replaced by clip, making the correlations bounded between -1 and 1
+    temp[upper.tri(temp)] = t(temp)[upper.tri(temp)]
+    # Replace lower elements with upper
+    diag(temp) = 1
+    
+    # Eigen check
+    E = eigen(temp, symmetric = TRUE) # Provides eigenvalues and vectors, eigen decomposition 
+    # t(E$vectors) %*% E$vectors will give the identity matrix, all eigenvalues must be >= 0
+    # E$vectors %*% diag(E$values, nrow = 5, ncol = 5) %*% solve(E$vectors) = temp (although symmetric)
+    vals = E$values # Eignevalues
+    vals[vals < tol.eig] = tol.eig # Replace any with a really small positive value that are less than 0
+    temp.psd = E$vectors %*% (diag(vals, nvar, nvar)) %*% t(E$vectors) # eigenvectors are orthonormal so that its inverse is equal to its transpose
+    # Rebuild the matrix that is psd  
+    d = sqrt(diag(temp.psd)) # Ensure it is correlation matrix
+    temp_cor = temp.psd / outer(d, d)
+    diag(temp_cor) = 1
+    
+    if (length(idx.big) > 0) {
+      big.mean = mean(temp_cor[idx.big]) # Average correlation size of larger correlations 
+    } else {
+      big.mean = NA_real_
+    }
+    setdiff(idx.lower, idx.big) # Returns elements present in first object but not in 2nd
+    idx.bg = setdiff(idx.lower, idx.big)
+    if (length(idx.bg) > 0) {
+      bg.mean = mean(temp_cor[idx.bg])
+    } else {
+      bg.mean = NA_real_
+    }
+    # Write what iteration and the average correlations of either baseline or larger
+    cat("\r", paste0("Iter ", iter,
+                     " | big mean=", ifelse(is.na(big.mean), "NA", round(big.mean, 3)),
+                     " | bg mean=", ifelse(is.na(bg.mean), "NA", round(bg.mean, 3))), sep = "")
+    flush.console()
+    # Tolerance, if less than whatever mean.tol is then move on(how off we are willing to be from set correlation)
+    ok_big = if (length(idx.big) > 0) abs(big.mean - mn.cor) <= mean.tol else TRUE
+    ok_bg  = if (length(idx.bg) > 0)  abs(bg.mean - bg.cor) <= mean.tol else TRUE
+    ok = ok_big && ok_bg
+    # If TRUE send loop and return PSD matrix 
+    if (ok) {
+      flag = 1
+      cat("\n")
+      return(temp_cor)
+    }
+    
+    if (iter >= iter.lim) {
+      flag = 1
+      cat("\nReached Iteration Limit. Returning last PSD correlation matrix.\n")
+      return(temp_cor)
+    }
+  }
+  
+  cat("\n")
+  return(NULL)
+}
+
+# Move from covariance to correlation matrix
+
+cov2cor = function(mat){
+  inv.sd = diag(1/sqrt(diag(mat)))
+  matrix = inv.sd %*% mat %*% inv.sd
+  return(matrix)
+}
+
+# Move from correlation to partial correlation matrix
+
+cor2pcor <- function(mat){
+  precision.mat <- solve(mat)
+  pcor.mat <- qgraph::wi2net(precision.mat)
+  pcor.mat <- as.matrix(pcor.mat)
+  return(pcor.mat)
+}
+
+# Generate a sparse precision matrix using sigma
+
+sparse.prec.mat = function(mat, prop = .3, tol = 1e-1, max.iter = 10000){
+  
+  p = nrow(mat)
+  
+  fail.count = 0
+  prec.mat.full = solve(mat)
+  
+  
+  idx.lower = which(lower.tri(prec.mat.full)) # Get indices of lower triangle
+  idx.pair = (p - 2) * p + p # the target and clone index
+  idx.target = (1:(p-2)-1)*p + (p-1) # target's index
+  idx.clone = (1:(p-2)-1) * p + p # clone index
+  
+  idx.pool = setdiff(idx.lower, c(idx.pair,idx.clone)) 
+  
+  p.zero = floor(prop * length(idx.lower)) # Number of 0s
+  p.zero = min(p.zero, length(idx.pool)) 
+  
+  
+  
+  for (i in 1:max.iter) {
+    prec.mat = prec.mat.full
+    idx.zero = sample(idx.pool, p.zero) # Sample from indices that should be 0
+    prec.mat[idx.zero] = 0 # Change the sampled indices to 0
+    
+    prec.mat[idx.clone] = prec.mat[idx.target] # Match clone and target
+    
+    prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] 
+
+    
+    idx.zero.restore = which(prec.mat == 0 & lower.tri(prec.mat))
+    
+    # Check for PSDness
+    E = eigen(x = prec.mat, symmetric = TRUE)
+    vals = E$values
+    vals[vals < 0] = tol
+    psd = E$vectors %*% (diag(vals, p, p)) %*% t(E$vectors)
+    
+    psd[idx.zero.restore] = 0 # Change the sampled indices to 0 
+    psd[upper.tri(psd)] = t(psd)[upper.tri(psd)] 
+    
+    
+    if(min(eigen(psd)$values) > 1e-8 && psd[p, p-1] != 0){
+      message("Found correct PSD matrix after ", fail.count, " failed attempt(s)")
+      return(psd)
+    }
+    
+    fail.count = fail.count + 1
+    
+  }
+  message("No valid matrix found after ", max.iter, " iterations")
+  return(NULL)
+  
+}
+
+# Take a sparse precision matrix and transform back into a correlation matrix
+
+sparse.sigma = function(mat){
+  precision = round(sparse.prec.mat(mat = mat,
+                             prop = sparsity), 4)
+  
+  sigma = round(cov2cor(solve(precision)), 4)
+  colnames(sigma) = colnames(precision) = c(paste0("p",
+                                                   1:(p -1)),
+                                            "target",
+                                            "clone")
+  rownames(sigma) = rownames(precision) = c(paste0("p", 1:(p -1)),
+                                            "target",
+                                            "clone")
+  return(list(sigma.mat = sigma,
+              prec.mat = precision))
+}
+
+# Add redundancy to model implied matrix using latent correlation matrix
+
+sigma.gen = function(mat, peripheral.loadings = .9, clone.loading = .9){
+  dim.mat = dim(mat)
+  lambda = diag(x = peripheral.loadings, nrow = dim.mat[1] + 1, ncol = dim.mat[2])
+  lambda[nrow(lambda), ncol(lambda)] = clone.loading
+  item.mat = lambda %*% mat %*% t(lambda)
+  dim.theta = dim(item.mat)
+  theta = diag(x = 1 - (peripheral.loadings)^2,
+               nrow = dim.theta[1],
+               ncol = dim.theta[2])
+  theta[nrow(theta), ncol(theta)] = 1 - (clone.loading)^2
+  
+  sigma = item.mat + theta 
+  
+
+  colnames(sigma) = rownames(sigma) = c(paste0("p", 1:(p -1)),
+                                        "target",
+                                        "clone")
+
+  
+  return(round(sigma, 4))
+}
+
+# LNM solution
+
+apply.lnm = function(sigma, p, nobs = 10000) {
+  lambda = diag(x = 1, nrow = p + 1, ncol = p)
+  lambda[p + 1, p] = 1
+  mod = lnm(cors = sigma, lambda = lambda, nobs = nobs,
+             omega_zeta = "full", identification = "variance") |>
+    runmodel()
+  round(getmatrix(mod, "omega_zeta"), 4)
+}
+
+# CFA 
+
+write.cfa <- function(p, cloneloading) {
+  lineend <- "\n "
+  cfa.mod <- ""
+  v <- 0
+  for (j in 1:(p-1))   {
+    v <- v + 1
+    cfa.mod <- paste0(cfa.mod, "F", j, " =~ 1*p", v, sep = "")
+    cfa.mod <- paste0(cfa.mod, lineend, sep = " ")
+  }
+  cfa.mod <- paste0(cfa.mod, "F", p, " =~ .9*target + ", cloneloading, "*clone")
+  return(cfa.mod)
+}
+
+```
+
+### Process
+
+```{r}
+
+# Sample a 5x5 latent correlation matrix
+# Set p 
+p = 5
+latent.mat = cor.gen(nvar = p)
+
+
+
+# Generate sigma matrix with redundancy
+redun.sigma = sigma.gen(latent.mat)
+
+# Set desired sparsity 
+sparsity = 0.3
+# Add sparsity 
+sparse.mats = sparse.sigma(mat = redun.sigma)
+
+# Subset by sigma and verify that it produces a sparse graph
+sparse.mats$prec.mat
+qgraph(round(cor2pcor(sparse.mats$sigma.mat), 4), edge.labels = TRUE,
+       theme = 'colorblind')
+
+
+# Apply 'lnm' solution and see if graph is sparse
+estimate = apply.lnm(sparse.mats$sigma.mat, p = 5) # Set p
+rownames(estimate) = colnames(estimate) = c(paste0("p", 1:(p-1)), "target")
+estimate # Works better, but rounding to 4 still picks up small edges that should be 0, and sometimes sparsity is not induced at all.
+qgraph(estimate, edge.labels = TRUE,
+       theme = "colorblind", labels = c(paste0("p", 1:(p-1)), "target")) 
+
+
+# Check if estimate matches the true network
+
+cfamod <- write.cfa(p = p, cloneloading = 0.9)
+fitcfa <- cfa(model = cfamod, sample.cov = sparse.mats$sigma.mat, sample.nobs = 100000, std.lv = TRUE)
+true.R <- lavInspect(fitcfa, "cov.lv")
+true.pcor = round(cor2pcor(true.R), 4)
+
+qgraph(true.pcor, edge.labels = TRUE,
+       theme = "colorblind", labels = c(paste0("p", 1:(p-1)), "target")) 
+
+estimate - true.pcor # In version 2, why are the residuals larger? In both versions I provide the, although different, same matrix to lnm() and cfa(). Why does the first version give us less error?
+
+mean(sparse.mats$sigma.mat[lower.tri(sparse.mats$sigma.mat)]) 
+mean(redun.sigma[lower.tri(redun.sigma)])
+
+```
