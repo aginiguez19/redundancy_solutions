@@ -93,7 +93,7 @@ cor.gen = function(nvar = NULL,
     # Write what iteration and the average correlations of either baseline or larger
     cat("\r", paste0("Iter ", iter,
                      " | big mean=", ifelse(is.na(big.mean), "NA", round(big.mean, 3)),
-                     " | bg mean=", ifelse(is.na(bg.mean), "NA", round(bg.mean, 3))), sep = "")
+                     " | bg mean=", ifelse(is.na(bg.mean), "NA",  round(bg.mean, 3))), sep = "")
     flush.console()
     # Tolerance, if less than whatever mean.tol is then move on(how off we are willing to be from set correlation)
     ok_big = if (length(idx.big) > 0) abs(big.mean - mn.cor) <= mean.tol else TRUE
@@ -119,82 +119,83 @@ cor.gen = function(nvar = NULL,
 
 
 # Get sparse precision matrix
-sparse.prec.mat.sim2 = function(mat, prop = .3, tol = 1e-1, max.iter = 10000){
-  
-  p = nrow(mat)
-  
-  fail.count = 0
-  prec.mat.full = solve(mat)
-  
-  
-  idx.lower = which(lower.tri(prec.mat.full)) # Get indices of lower triangle
-  idx.pair = (p - 2) * p + p # the target and clone index
-  idx.target = (1:(p-2)-1)*p + (p-1) # target's index
-  idx.clone = (1:(p-2)-1) * p + p # clone index
-  
-  idx.pool = setdiff(idx.lower, c(idx.pair,idx.clone)) # elements that are not the pair and clone's index
-  
-  p.zero = floor(prop * length(idx.lower)) # Number of 0s
-  p.zero = min(p.zero, length(idx.pool)) # safeguard if sparsity is set extremely high
-  
-  
-  
-  for (i in 1:max.iter) {
-    prec.mat = prec.mat.full
-    idx.zero = sample(idx.pool, p.zero) # Sample from indices that should be 0
-    prec.mat[idx.zero] = 0 # Change the sampled indices to 0
-    
-    prec.mat[idx.clone] = prec.mat[idx.target] # Match clone and target
-    
-    prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] # Make upper triangle the same
-    
-    # p = nrow(prec.mat)
-    # prec.mat[p, 1:(p-1)-1] = prec.mat[p-1,1:(p-1)-1]
-    # prec.mat[1:(p-1)-1, p] = prec.mat[1:(p-1)-1, p-1]
-    
-    # Preserve pattern of 0s 
-    
-    idx.zero.restore = which(prec.mat == 0 & lower.tri(prec.mat))
-    
-    # Check for PSDness
-    E = eigen(x = prec.mat, symmetric = TRUE)
-    vals = E$values
-    vals[vals < 0] = tol
-    psd = E$vectors %*% (diag(vals, p, p)) %*% t(E$vectors)
-    
-    psd[idx.zero.restore] = 0 # Change the sampled indices to 0 
-    psd[upper.tri(psd)] = t(psd)[upper.tri(psd)] # Make upper triangle the same
-    
-    
-    if(min(eigen(psd)$values) > 1e-8 && psd[p, p-1] != 0){
-      message("Found correct PSD matrix after ", fail.count, " failed attempt(s)")
-      return(psd)
-    }
-    
-    fail.count = fail.count + 1
-    
-  }
-  message("No valid matrix found after ", max.iter, " iterations")
-  return(NULL)
-  
-}
+# sparse.prec.mat.sim2 = function(mat, prop = .3, tol = 1e-1, max.iter = 10000){
+#   
+#   p = nrow(mat)
+#   
+#   fail.count = 0
+#   prec.mat.full = solve(mat)
+#   
+#   
+#   idx.lower = which(lower.tri(prec.mat.full)) # Get indices of lower triangle
+#   idx.pair = (p - 2) * p + p # the target and clone index
+#   idx.target = (1:(p-2)-1)*p + (p-1) # target's index
+#   idx.clone = (1:(p-2)-1) * p + p # clone index
+#   
+#   idx.pool = setdiff(idx.lower, c(idx.pair,idx.clone)) # elements that are not the pair and clone's index
+#   
+#   p.zero = floor(prop * length(idx.lower)) # Number of 0s
+#   p.zero = min(p.zero, length(idx.pool)) # safeguard if sparsity is set extremely high
+#   
+#   
+#   
+#   for (i in 1:max.iter) {
+#     prec.mat = prec.mat.full
+#     idx.zero = sample(idx.pool, p.zero) # Sample from indices that should be 0
+#     prec.mat[idx.zero] = 0 # Change the sampled indices to 0
+#     
+#     prec.mat[idx.clone] = prec.mat[idx.target] # Match clone and target
+#     
+#     prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] # Make upper triangle the same
+#     
+#     # p = nrow(prec.mat)
+#     # prec.mat[p, 1:(p-1)-1] = prec.mat[p-1,1:(p-1)-1]
+#     # prec.mat[1:(p-1)-1, p] = prec.mat[1:(p-1)-1, p-1]
+#     
+#     # Preserve pattern of 0s 
+#     
+#     idx.zero.restore = which(prec.mat == 0 & lower.tri(prec.mat))
+#     
+#     # Check for PSDness
+#     E = eigen(x = prec.mat, symmetric = TRUE)
+#     vals = E$values
+#     vals[vals < 0] = tol
+#     psd = E$vectors %*% (diag(vals, p, p)) %*% t(E$vectors)
+#     
+#     psd[idx.zero.restore] = 0 # Change the sampled indices to 0 
+#     psd[upper.tri(psd)] = t(psd)[upper.tri(psd)] # Make upper triangle the same
+#     
+#     
+#     if(min(eigen(psd)$values) > 1e-8 && psd[p, p-1] != 0){
+#       message("Found correct PSD matrix after ", fail.count, " failed attempt(s)")
+#       return(psd)
+#     }
+#     
+#     fail.count = fail.count + 1
+#     
+#   }
+#   message("No valid matrix found after ", max.iter, " iterations")
+#   return(NULL)
+#   
+# }
 
 
 
-sparse.prec.mat.sim1 = function(mat, prop = .3, tol = 1e-1, max.iter = 10000){
+sparse.prec.mat = function(mat, prop = .3, tol = 1e-1, max.iter = 100){
   
   
   p = nrow(mat)
   fail.count = 0
   prec.mat = solve(mat)
-  idx.lower = which(lower.tri(prec.mat)) # Get indices of lower triangle
-  p.zero = floor(prop * length(idx.lower)) # Number of 0s 
+  idx.lower = which(lower.tri(prec.mat)) 
+  p.zero = floor(prop * length(idx.lower))  
   
   for (i in 1:max.iter) {
-    idx.zero = sample(idx.lower, p.zero) # Sample from indices that should be 0
-    prec.mat[idx.zero] = 0 # Change the sampled indices to 0 
+    idx.zero = sample(idx.lower, p.zero) 
     
-    prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] # Make upper triangle the same
+    prec.mat[idx.zero] = 0  
+    
+    prec.mat[upper.tri(prec.mat)] = t(prec.mat)[upper.tri(prec.mat)] 
     
     # Check for PSDness
     E = eigen(x = prec.mat, symmetric = TRUE)
@@ -202,13 +203,9 @@ sparse.prec.mat.sim1 = function(mat, prop = .3, tol = 1e-1, max.iter = 10000){
     vals[vals < 0] = tol
     psd = E$vectors %*% (diag(vals, p, p)) %*% t(E$vectors)
     
-    psd[idx.zero] = 0 # Change the sampled indices to 0 
-    psd[upper.tri(psd)] = t(psd)[upper.tri(psd)] # Make upper triangle the same
+    psd[idx.zero] = 0 
+    psd[upper.tri(psd)] = t(psd)[upper.tri(psd)]
     
-    #psd[abs(psd) < tol] = 0 # Change noisy 0s to straight up 0s
-    
-    #zeros = sum(psd[lower.tri(psd)] == 0)
-    #proportion = round(zeros/(p*(p-1)/2), 1) # Tried making sure proportion of 0s match what sparsity I want .3, .5, etc 
     
     if(min(eigen(psd)$values) > 1e-8){
       message("Found correct PSD matrix after ", fail.count, " failed attempt(s)")
@@ -253,38 +250,41 @@ write.cfa <- function(p, cloneloading) {
 # apply.lnm(sigma = redundant.sigma, p = 10, nobs = 10000)
 
 # Get sparse precision matrix then convert back into correlation matrix
-sigma.sparse.sim2 = function(mat){
-  prec.mat = sparse.prec.mat.sim2(mat = mat,
-                             prop = sparsity)
+# sigma.sparse.sim2 = function(mat){
+#   prec.mat = sparse.prec.mat.sim2(mat = mat,
+#                              prop = sparsity)
+#   
+#   # Take "prec.mat" and turn back into a sparse latent correlation matrix
+#   sigma.corr = cov2cor(solve(prec.mat))
+#   colnames(sigma.corr) = colnames(prec.mat) = c(paste0("p",
+#                                                        1:(p -1)),
+#                                                 "target",
+#                                                 "clone")
+#   rownames(sigma.corr) = rownames(prec.mat) = c(paste0("p", 1:(p -1)),
+#                                                 "target",
+#                                                 "clone")
+#   return(list(sigma.corr = sigma.corr,
+#               prec.mat = prec.mat))
+# }
+
+
+
+# Combines sparse.prec.mat() to return both the sparse precision matrix and transformed latent correlation matrix 
+
+sparse.lat = function(mat){
+  precision =  round(sparse.prec.mat(mat = mat,
+                                    prop = sparsity), 2)
   
-  # Take "prec.mat" and turn back into a sparse latent correlation matrix
-  sigma.corr = cov2cor(solve(prec.mat))
-  colnames(sigma.corr) = colnames(prec.mat) = c(paste0("p",
-                                                       1:(p -1)),
-                                                "target",
-                                                "clone")
-  rownames(sigma.corr) = rownames(prec.mat) = c(paste0("p", 1:(p -1)),
-                                                "target",
-                                                "clone")
-  return(list(sigma.corr = sigma.corr,
-              prec.mat = prec.mat))
-}
-
-
-
-latent.gen.sim1 = function(mat){
-  prec.mat = sparse.prec.mat.sim1(mat = mat,
-                             prop = sparsity)
-  
-  # Take "prec.mat" and turn back into a sparse latent correlation matrix
-  latent.sparse = round(cov2cor(solve(prec.mat)), 3)
-  colnames(latent.sparse) = colnames(prec.mat) = c(paste0("p",
-                                                       1:(p -1)),
-                                                "target")
-  rownames(latent.sparse) = rownames(prec.mat) = c(paste0("p", 1:(p -1)),
-                                                "target")
-  return(list(latent.sparse = latent.sparse,
-              prec.mat = prec.mat))
+  # Take precision matrix and turn back into a correlation matrix
+  latent =  round(cov2cor(solve(precision)), 2)
+  colnames(latent) = colnames(precision) = c(paste0("p",
+                                                    1:(p -1)),
+                                             "target")
+  rownames(latent) = rownames(precision) = c(paste0("p",
+                                                    1:(p -1)),
+                                             "target")
+  return(list(lat.mat = latent,
+              prec.mat = precision))
 }
 
 
@@ -302,41 +302,13 @@ sigma.gen = function(mat, peripheral.loadings = .9, clone.loading = .9){
   sigma = item.mat + theta # Sigma (p+1 X p+1) with redundancy
   
   
-  
-  # Add sparsity to sigma
-  # Add same pattern of sparsity as sparse precision matrix of latent variables 
-  # sigma.prec = solve(sigma) # Get precision matrix of sigma
-  # block = sigma.prec[1:p, 1:p] # Get (p X p)  block
-  # block[pattern] = 0 # Add matching pattern of sparsity
-  # sigma.prec[1:p, 1:p] = block # Add block back into full "sigma.prec"
-  # 
-  # target.zeros = which(sigma.prec[p, ] == 0) # Find which of the target's edges are 0
-  # sigma.prec[p+1, target.zeros] = 0 # Match those 0 edges with the clone's edges
-  # sigma.prec[target.zeros, p+1] = 0
-  # 
-  # vals = eigen(sigma.prec, symmetric = TRUE, only.values = TRUE)$values
-  # if(!all(vals >= 1e-8)) warning("Precision matrix is not positive semi-definite!")
-  # 
-  # sigma.sparse = cov2cor(solve(sigma.prec))
+
   colnames(sigma) = rownames(sigma) = c(paste0("p", 1:(p -1)),
                                         "target",
                                         "clone")
-  # No longer need the code above. Tried something that was not actually related to our design 
+
   
-  
-  # # Get sparse sigma true (p X p) and turn into network
-  # sigma.true = sigma[1:p, 1:p]
-  # true.prec = solve(sigma.true)
-  # true.prec[pattern] = 0
-  # 
-  # sigma.true.net = -1*cov2cor(true.prec)
-  # diag(sigma.true.net) = 0 
-  # colnames(sigma.true.net) = rownames(sigma.true.net) = c(paste0("p", 1:(p -1)),
-  #                                                        "target")
-  # No longer need the code above. Tried something that was not actually related to our design 
-  
-  return(sigma)
-  # true.removal.net = sigma.true.net))
+  return(round(sigma, 2))
 }
 
 
@@ -367,43 +339,16 @@ composite.gen = function(mat, clone.loading = .9, peripheral.loadings = .9) {
    sigma.composite <- t(lambda) %*% Splus %*% lambda + theta
    
    
-   # Add sparsity to sigma.composite
-   
-   # sigma.composite.prec = solve(sigma.composite) # Precision matrix
-   # block.comp = sigma.composite.prec[1:p, 1:p] # Get (p X p)  composite block
-   # block.comp[pattern] = 0 # Add matching pattern of sparsity
-   # sigma.composite.prec[1:p, 1:p] = block.comp # Add block back into full "sigma.composite.prec"
-   # 
-   # target.zeros = which(sigma.composite.prec[p, ] == 0) # Find which of the target's edges are 0
-   # sigma.composite.prec[p+1, target.zeros] = 0 # Match those 0 edges with the clone's edges
-   # sigma.composite.prec[target.zeros, p+1] = 0
-   # 
-   # 
-   # vals = eigen(sigma.composite.prec, symmetric = TRUE, only.values = TRUE)$values
-   # if(!all(vals >= 1e-8)) warning("Composite precision matrix is not positive semi-definite!")
-   # 
-   # 
-   # sigma.composite.sparse = cov2cor(solve(sigma.composite.prec))
+
    colnames(sigma.composite) = rownames(sigma.composite) = c(paste0("p", 1:(p -1)),
                                                        "target",
                                                        "composite_clone")
-   # 
-   # 
-   # # Get sparse composite sigma true (p X p) and turn into network
-   # I = diag(x = 1, nrow = p, ncol = p + 1)
-   # I[p, p + 1] = 1
-   # 
-   # sum.mat = I %*% sigma.composite.sparse %*% t(I)
-   # sum.mat = cov2cor(sum.mat)
-   # 
-   # true.composite.net = -1*cor2pcor(sum.mat)
-   # diag(true.composite.net) = 0
-   # colnames(true.composite.net) = rownames(true.composite.net) = c(paste0("p", 1:(p-1)), "target")
-   # 
-   return(sigma.composite)
-               # true.composite.net = true.composite.net))
+
+
+   return(round(sigma.composite, 2))
+
 }
-# No longer need the code above. Tried something that was not actually related to our design 
+
 
 
 
@@ -442,7 +387,7 @@ donothing.gen = function(mat, loadings = .9, clone.loading = .9){
   if(!all(vals >= 0)) {
     return(NULL)
   }
-  return(sigma.nothing)
+  return(round(sigma.nothing, 2))
 }
 
 
@@ -450,14 +395,6 @@ donothing.gen = function(mat, loadings = .9, clone.loading = .9){
 # Performance Measures ----------------------------------------------------
 
 
-# Must be an igraph object!
-calc.correlation = function(est.net, true.net) {
-  true.edges = true.net[upper.tri(true.net)]
-  est.edges = est.net[upper.tri(est.net)]
-  
-  correlation = cor(true.edges, est.edges)
-  return(correlation)
-}
 
 
 
@@ -482,7 +419,7 @@ calc.wd.bias = function(est.net, true.net){
     # Est weighted density
     est.density = weighted.density(est.net)
     # Relative bias
-    return((est.density - true.density))
+    return(est.density- true.density)
   }
 }
 
@@ -495,11 +432,11 @@ calc.apl.bias = function(est.net, true.net){
     est.apl = mean_distance(graph = est.net,
                             weights = 1/abs(E(est.net)$weight))
     # Relative bias
-    return((est.apl - true.apl))
+    return(est.apl - true.apl)
   }
 }
 
-calc.strgth.bias = function(est.net, true.net, avg.last.two = FALSE){
+calc.strgth.bias = function(est.net, true.net){
   if (is_igraph(est.net) & is_igraph(true.net)) {
     # True strength of target  
     true.strength.all = strength(graph = true.net, weights = abs(E(true.net)$weight))
@@ -508,12 +445,12 @@ calc.strgth.bias = function(est.net, true.net, avg.last.two = FALSE){
     est.strength = strength(graph = est.net,
                             weights = abs(E(est.net)$weight))[p]
     # Relative bias
-    return((est.strength - true.strength))
+    return(est.strength - true.strength)
 
   }
 }
 
-calc.expctinflu.bias = function(est.net, true.net, avg.last.two = FALSE) {
+calc.expctinflu.bias = function(est.net, true.net) {
   if (is_igraph(est.net) & is_igraph(true.net)) {
     # True expected influence of target
     true.expected.all = strength(graph = true.net, weights = E(true.net)$weight)
@@ -522,60 +459,52 @@ calc.expctinflu.bias = function(est.net, true.net, avg.last.two = FALSE) {
     est.expected = strength(graph = est.net,
                             weights = E(est.net)$weight)[p]
     # Relative bias
-    return((est.expected - true.expected))
+    return(est.expected - true.expected)
     
   }
 }
 
 
 
-calc.closeness.bias = function(est.net, true.net, avg.last.two = FALSE){
+calc.closeness.bias = function(est.net, true.net){
   if (is_igraph(est.net) & is_igraph(true.net)) {
     # True closeness of target
-    true.closeness.all = closeness(graph = true.net, normalized = TRUE,
+    true.closeness.all = closeness(graph = true.net, normalized = FALSE,
                                    weights = 1/abs(E(true.net)$weight))
     true.closeness = true.closeness.all[p]
     # Est closeness of target
     est.closeness = closeness(graph = est.net,
-                             normalized = TRUE,
+                             normalized = FALSE,
                              weights = 1/abs(E(est.net)$weight))[p]
     # Relative bias
-    return((est.closeness - true.closeness))
+    return(est.closeness - true.closeness)
   }
 }
 
 
 
-calc.betweenness.bias = function(est.net, true.net, avg.last.two = FALSE){
+calc.betweenness.bias = function(est.net, true.net){
   if (is_igraph(est.net) & is_igraph(true.net)) {
     
     # True betweenness of target
     true.betweenness.all = betweenness(graph = true.net,
-                                       normalized = TRUE,
+                                       normalized = FALSE,
                                        weights = 1/abs(E(true.net)$weight))
     true.betweenness = true.betweenness.all[p]
     # Est betweenness of target
     est.betweenness = betweenness(graph = est.net,
-                              normalized = TRUE,
+                              normalized = FALSE,
                               weights = 1/abs(E(est.net)$weight))[p]
     # Bias
-    return((est.betweenness - true.betweenness))
+    return(est.betweenness - true.betweenness)
   }
 }
 
 
 
-calc.RMSE = function(est.net, true.net) {
-  if (is_igraph(est.net) & is_igraph(true.net)) {
-    est.net = as_adjacency_matrix(est.net,
-                                  attr = "weight",
-                                  sparse = FALSE)
-    true.net = as_adjacency_matrix(true.net,
-                                   attr = "weight",
-                                   sparse = FALSE)
-    }
-  idx = 1:(p - 1)
-  return(sqrt(mean((est.net[idx, p] - true.net[idx, p])^2)))
+calc.edge.bias = function(est.net, true.net) {
+  
+  return(est.net[upper.tri(est.net)] - true.net[upper.tri(true.net)])
   }
 
 
@@ -591,13 +520,18 @@ pcor.to.igraph = function(mat) {
 # Three solutions: each takes (p+1)×(p+1) sigma, returns p×p network
 
 apply.removal = function(sigma, p) {
-  cor2pcor(sigma[1:p, 1:p]) # Subset by p×p 
+  solution =  round(cor2pcor(sigma[1:p, 1:p]), 2)
+  solution[solution < 0.05] = 0
+  return(solution)
+
 }
 
 apply.composite = function(sigma, p) {
   I = diag(x = 1, nrow = p, ncol = p + 1)
   I[p, p + 1] = 1
-  cor2pcor(cov2cor(I %*% sigma %*% t(I)))
+  solution = round(cor2pcor(cov2cor(I %*% sigma %*% t(I))), 2)
+  solution[solution < 0.05] = 0
+  return(solution)
 }
 
 apply.lnm = function(sigma, p, nobs = 10000) {
@@ -606,50 +540,87 @@ apply.lnm = function(sigma, p, nobs = 10000) {
   mod = lnm(cors = sigma, lambda = lambda, nobs = nobs,
              omega_zeta = "full", identification = "variance") |>
     runmodel()
-  getmatrix(mod, "omega_zeta")
+  solution = round(getmatrix(mod, "omega_zeta"), 2)
+  solution[solution < 0.05] = 0
+  return(solution)
 }
 
 
 # Est.mat and true.mat are both p×p partial correlation matrices
 
 calc.all.metrics = function(est.mat, true.mat, avg.last.two = FALSE) {
+  p = nrow(est.mat)
   est.ig  <- pcor.to.igraph(est.mat)
-  # E(est.ig)$weight[abs(E(est.ig)$weight) < 1e-4] = 0 # Added to deal with inflated vals
-  # est.ig = delete_edges(est.ig, E(est.ig)[abs(E(est.ig)$weight) < 1e-3])
+
   true.ig <- pcor.to.igraph(true.mat)
-  # E(true.ig)$weight[abs(E(true.ig)$weight) < 1e-4] = 0
-  # true.ig = delete_edges(true.ig, E(true.ig)[abs(E(true.ig)$weight) < 1e-3])
   
   if (avg.last.two){
+    
     true.mat.final = collapse.pseudo(true.mat, p)
     true.ig.final = pcor.to.igraph(true.mat.final)
-    # E(true.ig.final)$weight[abs(E(true.ig.final)$weight) < 1e-4] = 0
-    # true.ig.final = delete_edges(true.ig.final, E(true.ig.final)[abs(E(true.ig.final)$weight) < 1e-3])
   } else {
-    true.mat.final = true.mat
     true.ig.final = true.ig
   }
   
+    wd = calc.wd.bias(est.ig, true.ig.final)
+    apl = calc.apl.bias(est.ig, true.ig.final)
+    strgth = calc.strgth.bias(est.ig, true.ig.final)
+    expctinflu = calc.expctinflu.bias(est.ig, true.ig.final)
+    closeness = calc.closeness.bias(est.ig, true.ig.final)
+    betweenness = calc.betweenness.bias(est.ig, true.ig.final)
+    
+    list(wd.bias = wd,
+         wd.abs.bias = abs(wd),
+         apl.bias = apl,
+         apl.abs.bias = abs(apl),
+         strgth.bias = strgth,
+         strgth.abs.bias = abs(strgth),
+         expctinflu.bias = expctinflu,
+         expctinflu.abs.bias = abs(expctinflu),
+         closeness.bias = closeness,
+         closeness.abs.bias = abs(closeness),
+         betweenness.bias = betweenness,
+         betweenness.abs.bias = abs(betweenness))
+    
+  
+}
+
+
+
+calc.edge.metrics = function(est.mat, true.mat, avg.last.two = FALSE) {
+  p = nrow(est.mat)
+  
+  if (avg.last.two){
+    
+    true.mat.final = collapse.pseudo(true.mat, p)
+    
+  } else {
+    true.mat.final = true.mat
+  }
+  
+  bias = calc.edge.bias(est.mat, true.mat.final)
+  idx = which(upper.tri(est.mat), arr.ind = TRUE)
+  
   list(
-    correlation       = calc.correlation(est.mat, true.mat.final),
-    wd.bias          = calc.wd.bias(est.ig, true.ig.final),
-    apl.bias         = calc.apl.bias(est.ig, true.ig.final),
-    strgth.bias      = calc.strgth.bias(est.ig, true.ig.final, avg.last.two),
-    expctinflu.bias  = calc.expctinflu.bias(est.ig, true.ig.final, avg.last.two),
-    closeness.bias   = calc.closeness.bias(est.ig, true.ig.final, avg.last.two),
-    betweenness.bias = calc.betweenness.bias(est.ig, true.ig.final, avg.last.two),
-    RMSE              = calc.RMSE(est.mat, true.mat.final)
+    node1 = idx[, "row"],
+    node2 = idx[, "col"],
+    edge.bias = bias,
+    edge.abs.bias = abs(bias)
   )
 }
+
 
 # Collapse Pseudo so it can be compared when using global measures and correlations
 
 collapse.pseudo = function(mat, p) {
   out = mat[1:p, 1:p]                                  
-  out[1:(p-1), p] = (mat[1:(p-1), p] + mat[1:(p-1), p + 1]) / 2    # avg peripheral -> {target, clone}
-  out[p, 1:(p-1)] = out[1:(p-1), p]                               # keep symmetric                                        
+  out[1:(p-1), p] = (mat[1:(p-1), p] + mat[1:(p-1), p + 1]) / 2 
+  out[p, 1:(p-1)] = out[1:(p-1), p]                                                            
   return(out)
 }
+
+
+
 
 
 

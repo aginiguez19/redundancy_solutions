@@ -26,15 +26,15 @@ source(file = "02_functions.R")
 
 conditions = expand.grid(
   p = c(10, 20),
-  lat.cor = c( 0.3, 0.5, 0.7),
-  sparsity = c(0, 0.3, 0.5, 0.7), 
+  lat.cor = c(0.3, 0.5, 0.7),
+  sparsity = c(0, 0.3, 0.5), 
   lvl.redun = c(0.7, 0.8, 0.9) 
 )
 
 
 
 ncond = nrow(conditions)
-n.iter = 5
+n.iter = 100
 
 
 solutions = list(
@@ -43,11 +43,12 @@ solutions = list(
   lnm = apply.lnm)
 
 perf.list = list()
+edge.list = list()
 
 matrices = vector(mode = "list", length = ncond)
 
 
-
+start.time = Sys.time()
 for (c in 1:ncond) {
   p = conditions$p[c]
   lat.cor = conditions$lat.cor[c]
@@ -65,52 +66,43 @@ for (c in 1:ncond) {
       
   
     # Generate
-    lat.mat = cor.gen(nvar = p, mn.cor = lat.cor) # Start by generating a latent pXp correlation matrix
-    sparse.latent.mat = latent.gen.sim1(mat = lat.mat)$latent.sparse # Then make the precision matrix sparse, now we can use 
-
-   
     
+    latent.mat = cor.gen(nvar = p, mn.cor = lat.cor) # Start by generating a latent pXp correlation matrix
+    sparse.latent.mat = sparse.lat(mat = latent.mat)$lat.mat # Then make the precision matrix sparse, now we can use 
+
 
   
     # Get (p+1) X (p+1) redundant sigma
     redundant.sigma = sigma.gen(mat = sparse.latent.mat, peripheral.loadings = .9, clone.loading = lvl.redun)
     
-    
-
-  
-    
-  
-    
-    
     # True
     
-    cfamod <- write.cfa(p = p, cloneloading = lvl.redun)
-    fitcfa <- cfa(model = cfamod, sample.cov = redundant.sigma, sample.nobs = 100000, std.lv = TRUE)
-    true.R <- lavInspect(fitcfa, "cov.lv")
-    omega.latent <- cor2pcor(true.R)
-  
+    cfamod = write.cfa(p = p, cloneloading = lvl.redun)
+    fitcfa = cfa(model = cfamod, sample.cov = redundant.sigma, sample.nobs = 100000, std.lv = TRUE)
+    true.R = lavInspect(fitcfa, "cov.lv")
+    omega.latent = round(cor2pcor(true.R), 2)
+    omega.latent[omega.latent < 0.05] = 0
     
-    composite.sigma <- composite.gen(mat = sparse.latent.mat,
+    composite.sigma = composite.gen(mat = sparse.latent.mat,
                                      clone.loading       = lvl.redun,
                                      peripheral.loadings = .9)
-    round(composite.sigma, 4)
     
-    I.mat              <- diag(x = 1, nrow = p, ncol = p + 1)
-    I.mat[p, p + 1]    <- 1
-    omega.composite    <- round(cor2pcor(cov2cor(I.mat %*% composite.sigma %*% t(I.mat))),4)
+    I.mat = diag(x = 1, nrow = p, ncol = p + 1)
+    I.mat[p, p + 1] = 1
+    omega.composite = round(cor2pcor(cov2cor(I.mat %*% composite.sigma %*% t(I.mat))), 2)
+    omega.composite[omega.composite < 0.05] = 0
     
     # Get (p+1) X (p+1) pseudo-redundancy sigma 
     pseudo.sigma = donothing.gen(mat = sparse.latent.mat)
-    round(pseudo.sigma, 4)
     
     # True
     
-    omega.pseudo = cor2pcor(pseudo.sigma)
+    omega.pseudo = round(cor2pcor(pseudo.sigma), 2)
+    omega.pseudo[omega.pseudo < 0.05] = 0
     
-    round(omega.pseudo, 4)
     
     mats = list(
-      latent.corr.mat = lat.mat, 
+      latent.corr.mat = latent.mat, 
       sparse.latent.mat = sparse.latent.mat,
       redundant.sigma   = redundant.sigma,
       composite.sigma   = composite.sigma,
@@ -137,10 +129,13 @@ for (c in 1:ncond) {
       for (sigma.name in names(sigmas)) { # Pulls redundant, composite, then pseudo
         for (sol.name in names(solutions)) { # Pulls each solution and applies for each sigma above
           # Solutions gets the correct solution function and the corresponding sigma
-          est.mat  <- solutions[[sol.name]](sigmas[[sigma.name]], p) # Need p so functions can run 
-          true.mat <- truths[[sigma.name]]              # matched truth
-          metrics  <- calc.all.metrics(est.mat, true.mat,
-                                       avg.last.two = (sigma.name == "pseudo")) # Will always be the correct truth that all solutions are tested against
+          est.mat  = solutions[[sol.name]](sigmas[[sigma.name]], p) # Need p so functions can run 
+          true.mat = truths[[sigma.name]]              # matched truth
+          metrics  = calc.all.metrics(est.mat, true.mat,
+                                       avg.last.two = (sigma.name == "pseudo"))
+          edge.metrics = calc.edge.metrics(est.mat, true.mat,
+                                           avg.last.two = (sigma.name == "pseudo"))
+          # Will always be the correct truth that all solutions are tested against
           # Should match the sigma name so for example the composite sigma has all solutions applied to it and then tested against the true composite
           
           perf.list[[length(perf.list) + 1]] = data.frame(
@@ -151,11 +146,25 @@ for (c in 1:ncond) {
             lvl.redun = lvl.redun,
             iteration  = i,
             sigma.type = sigma.name,
-            truth = sigma.name, # Decide whether to add additional column or change sigma.type to truth 
+            truth = sigma.name, 
             solution   = sol.name,
             as.data.frame(metrics),
             row.names = NULL
           )
+          
+          
+          edge.list[[length(edge.list) + 1]] = data.frame(
+            condition = c,
+            p = p, 
+            lat.cor = lat.cor, 
+            sparsity = sparsity,
+            lvl.redun = lvl.redun,
+            iteration  = i,
+            sigma.type = sigma.name,
+            truth = sigma.name, 
+            solution   = sol.name,
+            as.data.frame(edge.metrics),
+            row.names = NULL)
           
         }
       }
@@ -165,19 +174,47 @@ for (c in 1:ncond) {
   }
   
   saveRDS(object = perf.list, 
-          file = "/Users/aginigue/Desktop/simulation_resultsP6_100.rds")
+          file = "/Users/aginigue/Desktop/simulation_resultsR2.rds")
   saveRDS(object = matrices,
-          file = "/Users/aginigue/Desktop/simulation_matricesP6_100.rds")
+          file = "/Users/aginigue/Desktop/simulation_matricesR2.rds")
 }
 
-perf.df <- do.call(rbind, perf.list) # call rbind and connect perf.list together 
+perf.df = do.call(rbind, perf.list) # call rbind and connect perf.list together 
+edge.df = do.call(rbind, edge.list)
 # Need to save results as well and the matrices 
 row.names(perf.df) = NULL
-View(perf.df)
+row.names(edge.df) = NULL
+
+end.time = Sys.time()
+time.taken = end.time - start.time
+print(time.taken)
+xfun::session_info()
 
 
 
 
 
 
+sparsity = 0.5
+p = 5
+lvl.redun = 0.9
+nsim = 500
+ratios = matrix(data = NA, nrow = 100, ncol = 1, byrow = TRUE)
+for (i in 1:nsim){
+latent.mat = cor.gen(nvar = p, mn.cor = 0.5)
+sparse.latent.mat = sparse.lat(mat = latent.mat)$lat.mat
+redundant.sigma = sigma.gen(mat = sparse.latent.mat, peripheral.loadings = .9, clone.loading = lvl.redun)
+cfamod = write.cfa(p = p, cloneloading = lvl.redun)
+fitcfa = cfa(model = cfamod, sample.cov = redundant.sigma, sample.nobs = 100000, std.lv = TRUE)
+true.R = lavInspect(fitcfa, "cov.lv")
+omega.latent = round(cor2pcor(true.R), 2)
+
+sparse.ratio = sum(omega.latent[lower.tri(omega.latent)] == 0)/((p * (p-1))/2)
+ratios[i] = sparse.ratio
+}
+
+if (omega.latent[lower.tri(omega.latent)] < 0.05){
+  omega.latent[lower.tri(omega.latent)] < 0.05
+}
+omega.latent[omega.latent < 0.05] = 0
 
