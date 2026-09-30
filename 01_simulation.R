@@ -34,7 +34,7 @@ conditions = expand.grid(
 
 
 ncond = nrow(conditions)
-n.iter = 100
+n.iter = 50
 
 
 solutions = list(
@@ -194,27 +194,26 @@ xfun::session_info()
 
 
 
-
-sparsity = 0.5
-p = 5
-lvl.redun = 0.9
-nsim = 500
-ratios = matrix(data = NA, nrow = 100, ncol = 1, byrow = TRUE)
-for (i in 1:nsim){
-latent.mat = cor.gen(nvar = p, mn.cor = 0.5)
-sparse.latent.mat = sparse.lat(mat = latent.mat)$lat.mat
-redundant.sigma = sigma.gen(mat = sparse.latent.mat, peripheral.loadings = .9, clone.loading = lvl.redun)
-cfamod = write.cfa(p = p, cloneloading = lvl.redun)
-fitcfa = cfa(model = cfamod, sample.cov = redundant.sigma, sample.nobs = 100000, std.lv = TRUE)
-true.R = lavInspect(fitcfa, "cov.lv")
-omega.latent = round(cor2pcor(true.R), 2)
-
-sparse.ratio = sum(omega.latent[lower.tri(omega.latent)] == 0)/((p * (p-1))/2)
-ratios[i] = sparse.ratio
-}
-
-if (omega.latent[lower.tri(omega.latent)] < 0.05){
-  omega.latent[lower.tri(omega.latent)] < 0.05
-}
-omega.latent[omega.latent < 0.05] = 0
-
+# 
+# sparsity = 0.3
+# p = 5
+# lvl.redun = 0.9
+# nsim = 500
+# ratios = matrix(data = NA, nrow = 100, ncol = 1, byrow = TRUE)
+# for (i in 1:nsim){
+# latent.mat = cor.gen(nvar = p, mn.cor = 0.5)
+# sparse.latent.mat = sparse.lat(mat = latent.mat)$lat.mat
+# redundant.sigma = sigma.gen(mat = sparse.latent.mat, peripheral.loadings = .9, clone.loading = lvl.redun)
+# cfamod = write.cfa(p = p, cloneloading = lvl.redun)
+# fitcfa = cfa(model = cfamod, sample.cov = redundant.sigma, sample.nobs = 100000, std.lv = TRUE)
+# true.R = lavInspect(fitcfa, "cov.lv")
+# omega.latent = round(cor2pcor(true.R), 2)
+# omega.latent[omega.latent < 0.05] = 0
+# 
+# sparse.ratio = sum(omega.latent[lower.tri(omega.latent)] == 0)/((p * (p-1))/2)
+# ratios[i] = sparse.ratio
+# }
+# 
+# 
+# mean(ratios)
+# ratios
